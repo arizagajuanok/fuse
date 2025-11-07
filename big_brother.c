@@ -56,8 +56,44 @@ static u32 bb_find_orphan_cluster(fat_table table) {
     return orphan_cur_cluster;
 }
 
+static int bb_create_bb_directory_in_cluster(u32 cur_cluster, fat_table table) {
+    errno = 0;
+    fat_file orphan_dir = fat_file_init_orphan_dir(BB_DIRNAME, table, cur_cluster); // Creo archivos temporales para poder usar add_child
+    fat_file log_file = fat_file_init(table, false, strdup(BB_LOG_FILE));
+    if (log_file == NULL) {
+        return -errno;
+    }
+    fat_file_dentry_add_child(orphan_dir, log_file);    // Escribo en el disco fs.log y bb
+    if (errno != 0) {
+        DEBUG("Error al escribir en el disco\n");
+        return -errno;
+    }
+    fat_file_destroy(log_file);     // Libero momoria
+    fat_file_destroy(orphan_dir);
+    return -errno;
+}
+
+static u32 bb_create_orphan_directory(fat_table table) {
+    u32 orphan_cur_cluster = fat_table_get_next_free_cluster(table);    // Obtengo un la direccion de un cluster libre
+    int error = fat_table_set_next_cluster(table, orphan_cur_cluster, FAT_CLUSTER_BAD_SECTOR);  // Marco el cluster como BAD_SECTOR
+    if (error == -1) {
+        DEBUG("Error al escribir el cluster: %u\n", orphan_cur_cluster);
+        return 0;
+    }
+    bb_create_bb_directory_in_cluster(orphan_cur_cluster, table);   // Escribo el archivo fs.log y el directorio bb en el disco
+    return orphan_cur_cluster;
+}
+
 int bb_create_new_log_files(fat_volume vol) {
     errno = 0;
     u32 orphan_cur_cluster = bb_find_orphan_cluster(vol->table);    // Obtengo la posicion del cluster huerfano en la FAT Table
+    
+    if (orphan_cur_cluster == 0) {
+        orphan_cur_cluster = bb_create_orphan_directory(vol->table);    // Creo un directorio huerfano y guardo la direccion del cluster
+        if (orphan_cur_cluster == 0) {
+            DEBUG("Error al crear el cluster huerfano\n");
+        }
+    }
+
     return -errno;
 }
