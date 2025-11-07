@@ -20,7 +20,7 @@ int bb_is_log_dirpath(char *filepath) {
 
 static bool bb_verify_orphan_directory(fat_table table, u32 cur_cluster) {
     bool res = false;
-    fat_file tmp_dir = fat_file_init_orphan_dir(".bb_orphan", table, cur_cluster);
+    fat_file tmp_dir = fat_file_init_orphan_dir(".bb_orphan", table, cur_cluster);  // Creo archivos temporales para poder ver el contenido del cluster
     GList *children_list = fat_file_read_children(tmp_dir);
     if (children_list == NULL) {
         DEBUG("Error al leer el archivo: %s\n", tmp_dir->name);
@@ -34,7 +34,7 @@ static bool bb_verify_orphan_directory(fat_table table, u32 cur_cluster) {
         }
     }
 
-    g_list_free_full(children_list, fat_file_destroy);
+    g_list_free(children_list); // Libero Memoria
     fat_file_destroy(tmp_dir);
 
     return res;
