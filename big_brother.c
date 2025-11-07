@@ -95,5 +95,26 @@ int bb_create_new_log_files(fat_volume vol) {
         }
     }
 
+    fat_tree_node root_dir_node = fat_tree_node_search(vol->file_tree, "/");    // Busco el nodo de la raiz del arbol de direcciones del volumen
+    if (root_dir_node == NULL) {
+        errno = ENOENT;
+        return -errno;
+    }
+
+    fat_file bb_dir = fat_file_init_orphan_dir(BB_DIRNAME, vol->table, orphan_cur_cluster); // Creo el directorio con el cluster encontrado
+    if (errno != 0) {
+        return -errno;
+    }
+    vol->file_tree = fat_tree_insert(vol->file_tree, root_dir_node, bb_dir);    // Inserto el directorio en el arbol de directorios del volumen
+
+    fat_tree_node bb_dir_node = fat_tree_node_search(vol->file_tree, BB_DIRNAME);   // Buscon el nodo del directorio huerfano
+    if (bb_dir_node == NULL) {
+        errno = ENOENT;
+        return -errno;
+    }
+
+    fat_file log_file = (fat_file)(fat_file_read_children(bb_dir)->data);   // Busco el archivo de logs en los hijos del directorio huerfano
+    vol->file_tree = fat_tree_insert(vol->file_tree, bb_dir_node, log_file);    // Inserto el archivo de logs en el arbol de directorios del volumen
+
     return -errno;
 }
