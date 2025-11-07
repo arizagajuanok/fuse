@@ -17,3 +17,8 @@ int bb_is_log_filepath(char *filepath) {
 int bb_is_log_dirpath(char *filepath) {
     return strncmp(BB_DIRNAME, filepath, 15) == 0;
 }
+
+int bb_create_new_log_files(fat_volume vol) {
+    errno = 0;
+    return -errno;
+}

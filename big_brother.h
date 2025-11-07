@@ -16,7 +16,7 @@ int bb_is_log_dirpath(char *filepath);
 
 // Ejemplos de funciones que tal vez les sean utiles
 // u32 search_bb_orphan_dir_cluster(fat_volume vol);
-// int bb_create_new_log_files(fat_volume vol);
+int bb_create_new_log_files(fat_volume vol);
 // int bb_init_log_dir(fat_volume vol, u32 start_cluster);
 
 #endif

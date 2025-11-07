@@ -21,6 +21,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
+// #include <pwd.h>
 
 
 #define LOG_MESSAGE_SIZE 100
@@ -40,6 +41,7 @@ static void fat_fuse_log_activity(char *operation_type, fat_file file) {
     now_to_str(buf);
     strcat(buf, "\t");
     strcat(buf, getlogin());
+    // strcat(buf, getpwuid(getuid())->pw_name);
     strcat(buf, "\t");
     strcat(buf, file->filepath);
     strcat(buf, "\t");
@@ -47,7 +49,7 @@ static void fat_fuse_log_activity(char *operation_type, fat_file file) {
     strcat(buf, "\n");
 
     fat_volume vol = get_fat_volume();
-    fat_tree_node log_file_node = fat_tree_node_search(vol->file_tree, "/fs.log");
+    fat_tree_node log_file_node = fat_tree_node_search(vol->file_tree, BB_LOG_FILE);
     fat_file log_file = fat_tree_get_file(log_file_node);
     size_t size = strlen(buf);
     off_t offset = log_file->dentry->file_size;
@@ -85,28 +87,10 @@ fat_volume fat_fuse_init(fat_volume vol) {
     fat_tree_node root_dir_node = fat_tree_node_search(vol->file_tree, "/");
     fat_fuse_load_directory_children(vol, root_dir_node);
 
-    fat_tree_node log_file_node = fat_tree_node_search(vol->file_tree, "/fs.log");
-
-    if (log_file_node == NULL) {
-        fat_file parent, log_file;
-
-        if (root_dir_node == NULL) {
-            return NULL;
-        }
-        parent = fat_tree_get_file(root_dir_node);
-        if (!fat_file_is_directory(parent)) {
-            fat_error("Error! Parent is not directory\n");
-            return NULL;
-        }
-        
-        log_file = fat_file_init(vol->table, false, strdup("/fs.log"));
-        if (log_file == NULL) {
-            return NULL;
-        }
-        // insert to directory tree representation
-        vol->file_tree = fat_tree_insert(vol->file_tree, root_dir_node, log_file);
-        // Write dentry in parent cluster
-        fat_file_dentry_add_child(parent, log_file);
+    bb_create_new_log_files(vol);
+    if (errno != 0) {
+        DEBUG("Error al crear log files\n");
+        return NULL;
     }
 
     return vol;
@@ -241,7 +225,7 @@ int fat_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     children = fat_tree_flatten_h_children(dir_node);
     child = children;
     while (*child != NULL) {
-        if (strcmp((*child)->name, "fs.log") != 0) {
+        if (!bb_is_log_dirpath((*child)->filepath)) {
             error = (*filler)(buf, (*child)->name, NULL, 0);
         }
         if (error != 0) {
@@ -264,7 +248,7 @@ int fat_fuse_read(const char *path, char *buf, size_t size, off_t offset,
 
     bytes_read = fat_file_pread(file, buf, size, offset, parent);
 
-    if (strcmp(file->filepath, "/fs.log") != 0) {
+    if (!bb_is_log_filepath(file->filepath)) {
         fat_fuse_log_activity("Read", file);
     }
 
@@ -286,7 +270,7 @@ int fat_fuse_write(const char *path, const char *buf, size_t size, off_t offset,
 
     bytes_written = fat_file_pwrite(file, buf, size, offset, parent);
 
-    if (strcmp(file->filepath, "/fs.log") != 0) {
+    if (!bb_is_log_filepath(file->filepath)) {
         fat_fuse_log_activity("Write", file);
     }
 
